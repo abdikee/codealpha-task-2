@@ -43,14 +43,19 @@ export default function NotificationsPage() {
 
   const loadNotifications = async () => {
     if (!user) return;
-    setLoading(false);
     const { data } = await supabase
       .from("notifications")
-      .select("*, profiles!notifications_actor_id_fkey(username, avatar_url)")
+      .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50);
-    setNotifications((data ?? []) as NotifWithActor[]);
+
+    const notifs = data ?? [];
+    const actorIds = [...new Set(notifs.map((n) => n.actor_id))];
+    const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", actorIds);
+    const profileMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
+
+    setNotifications(notifs.map((n) => ({ ...n, profiles: profileMap.get(n.actor_id) ?? null })) as NotifWithActor[]);
     setLoading(false);
   };
 
