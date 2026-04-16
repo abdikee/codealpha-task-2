@@ -36,8 +36,9 @@ export default function AuthPage() {
         toast.success("Account created! Check your email to confirm.");
       }
       navigate("/");
-    } catch (err: any) {
-      toast.error(err.message || "Authentication failed");
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Authentication failed");
     } finally {
       setLoading(false);
     }

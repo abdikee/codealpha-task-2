@@ -37,12 +37,12 @@ export async function createPost(userId: string, content: string, imageFile?: Fi
   return post;
 }
 
-async function attachProfiles(posts: any[]) {
+async function attachProfiles(posts: Array<Record<string, unknown>>) {
   if (posts.length === 0) return posts;
-  const userIds = [...new Set(posts.map((p) => p.user_id))];
+  const userIds = [...new Set(posts.map((p) => p.user_id as string))];
   const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", userIds);
   const profileMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
-  return posts.map((p) => ({ ...p, profiles: profileMap.get(p.user_id) ?? null }));
+  return posts.map((p) => ({ ...p, profiles: profileMap.get(p.user_id as string) ?? null }));
 }
 
 export async function fetchFeed(userId: string, page: number, limit = 10) {

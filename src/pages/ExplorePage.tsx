@@ -12,7 +12,7 @@ import { Tables } from "@/integrations/supabase/types";
 
 export default function ExplorePage() {
   const { user } = useAuth();
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
   const [trendingTags, setTrendingTags] = useState<{ tag: string; count: number }[]>([]);
   const [suggestions, setSuggestions] = useState<Tables<"profiles">[]>([]);
@@ -33,8 +33,8 @@ export default function ExplorePage() {
       .limit(100);
 
     const tagCounts: Record<string, number> = {};
-    tags?.forEach((t: any) => {
-      const tag = t.hashtags?.tag;
+    tags?.forEach((t: Record<string, unknown>) => {
+      const tag = (t.hashtags as { tag?: string })?.tag;
       if (tag) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
     });
     const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([tag, count]) => ({ tag, count }));
