@@ -19,7 +19,6 @@ export async function createPost(userId: string, content: string, imageFile?: Fi
     .single();
   if (error) throw error;
 
-  // Extract and save hashtags
   const tags = content.match(/#[\w]+/g);
   if (tags && post) {
     for (const rawTag of tags) {
@@ -38,6 +37,14 @@ export async function createPost(userId: string, content: string, imageFile?: Fi
   return post;
 }
 
+async function attachProfiles(posts: any[]) {
+  if (posts.length === 0) return posts;
+  const userIds = [...new Set(posts.map((p) => p.user_id))];
+  const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", userIds);
+  const profileMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
+  return posts.map((p) => ({ ...p, profiles: profileMap.get(p.user_id) ?? null }));
+}
+
 export async function fetchFeed(userId: string, page: number, limit = 10) {
   const { data: following } = await supabase.from("follows").select("following_id").eq("follower_id", userId);
   const followIds = following?.map((f) => f.following_id) ?? [];
@@ -48,12 +55,13 @@ export async function fetchFeed(userId: string, page: number, limit = 10) {
 
   const { data, count } = await supabase
     .from("posts")
-    .select("*, profiles!posts_user_id_fkey(username, avatar_url)", { count: "exact" })
+    .select("*", { count: "exact" })
     .in("user_id", allIds)
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  return { posts: data ?? [], total: count ?? 0, page, limit };
+  const posts = await attachProfiles(data ?? []);
+  return { posts, total: count ?? 0, page, limit };
 }
 
 export async function fetchExplorePosts(page: number, limit = 20) {
@@ -63,23 +71,20 @@ export async function fetchExplorePosts(page: number, limit = 20) {
 
   const { data, count } = await supabase
     .from("posts")
-    .select("*, profiles!posts_user_id_fkey(username, avatar_url), likes(count)", { count: "exact" })
+    .select("*", { count: "exact" })
     .gte("created_at", twoDaysAgo)
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  return { posts: data ?? [], total: count ?? 0 };
+  const posts = await attachProfiles(data ?? []);
+  return { posts, total: count ?? 0 };
 }
 
 export async function fetchPostById(postId: string, userId?: string) {
-  const { data: post } = await supabase
-    .from("posts")
-    .select("*, profiles!posts_user_id_fkey(username, avatar_url)")
-    .eq("id", postId)
-    .single();
-
+  const { data: post } = await supabase.from("posts").select("*").eq("id", postId).single();
   if (!post) return null;
 
+  const { data: profile } = await supabase.from("profiles").select("username, avatar_url").eq("user_id", post.user_id).single();
   const { count: likeCount } = await supabase.from("likes").select("id", { count: "exact", head: true }).eq("post_id", postId);
   const { count: commentCount } = await supabase.from("comments").select("id", { count: "exact", head: true }).eq("post_id", postId);
 
@@ -92,7 +97,7 @@ export async function fetchPostById(postId: string, userId?: string) {
     isBookmarked = !!bm;
   }
 
-  return { ...post, like_count: likeCount ?? 0, comment_count: commentCount ?? 0, is_liked: isLiked, is_bookmarked: isBookmarked };
+  return { ...post, profiles: profile, like_count: likeCount ?? 0, comment_count: commentCount ?? 0, is_liked: isLiked, is_bookmarked: isBookmarked };
 }
 
 export async function searchPosts(query: string, page: number, limit = 10) {
@@ -100,11 +105,12 @@ export async function searchPosts(query: string, page: number, limit = 10) {
   const to = from + limit - 1;
   const { data, count } = await supabase
     .from("posts")
-    .select("*, profiles!posts_user_id_fkey(username, avatar_url)", { count: "exact" })
+    .select("*", { count: "exact" })
     .ilike("content", `%${query}%`)
     .order("created_at", { ascending: false })
     .range(from, to);
-  return { posts: data ?? [], total: count ?? 0 };
+  const posts = await attachProfiles(data ?? []);
+  return { posts, total: count ?? 0 };
 }
 
 export async function fetchPostsByHashtag(tag: string, page: number, limit = 10) {
@@ -112,22 +118,17 @@ export async function fetchPostsByHashtag(tag: string, page: number, limit = 10)
   if (!hashtag) return { posts: [], total: 0 };
 
   const from = (page - 1) * limit;
-  const to = from + limit - 1;
-
-  const { data: postHashtags } = await supabase
-    .from("post_hashtags")
-    .select("post_id")
-    .eq("hashtag_id", hashtag.id);
-
+  const { data: postHashtags } = await supabase.from("post_hashtags").select("post_id").eq("hashtag_id", hashtag.id);
   const postIds = postHashtags?.map((ph) => ph.post_id) ?? [];
   if (postIds.length === 0) return { posts: [], total: 0 };
 
   const { data, count } = await supabase
     .from("posts")
-    .select("*, profiles!posts_user_id_fkey(username, avatar_url)", { count: "exact" })
+    .select("*", { count: "exact" })
     .in("id", postIds)
     .order("created_at", { ascending: false })
-    .range(from, to);
+    .range(from, from + limit - 1);
 
-  return { posts: data ?? [], total: count ?? 0 };
+  const posts = await attachProfiles(data ?? []);
+  return { posts, total: count ?? 0 };
 }

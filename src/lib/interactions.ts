@@ -7,7 +7,6 @@ export async function toggleLike(postId: string, userId: string) {
     return false;
   } else {
     await supabase.from("likes").insert({ post_id: postId, user_id: userId });
-    // Create notification for post owner
     const { data: post } = await supabase.from("posts").select("user_id").eq("id", postId).single();
     if (post && post.user_id !== userId) {
       await supabase.from("notifications").insert({ user_id: post.user_id, actor_id: userId, type: "like", post_id: postId });
@@ -46,9 +45,13 @@ export async function addComment(postId: string, userId: string, content: string
   const { data, error } = await supabase
     .from("comments")
     .insert({ post_id: postId, user_id: userId, content, parent_id: parentId ?? null })
-    .select("*, profiles!comments_user_id_fkey(username, avatar_url)")
+    .select()
     .single();
   if (error) throw error;
+
+  // Attach profile
+  const { data: profile } = await supabase.from("profiles").select("username, avatar_url").eq("user_id", userId).single();
+  const commentWithProfile = { ...data, profiles: profile };
 
   const { data: post } = await supabase.from("posts").select("user_id").eq("id", postId).single();
   if (post && post.user_id !== userId) {
@@ -59,7 +62,7 @@ export async function addComment(postId: string, userId: string, content: string
     });
   }
   await supabase.from("activity_log").insert({ user_id: userId, action: "commented", target_id: postId });
-  return data;
+  return commentWithProfile;
 }
 
 export async function getPostLikeInfo(postId: string, userId?: string) {
