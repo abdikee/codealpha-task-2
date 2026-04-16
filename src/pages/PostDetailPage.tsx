@@ -46,12 +46,17 @@ export default function PostDetailPage() {
   const loadComments = async () => {
     const { data } = await supabase
       .from("comments")
-      .select("*, profiles!comments_user_id_fkey(username, avatar_url)")
+      .select("*")
       .eq("post_id", id!)
       .is("parent_id", null)
       .order("created_at", { ascending: true });
 
-    const topLevel = (data ?? []) as CommentWithProfile[];
+    const comments = data ?? [];
+    const userIds = [...new Set(comments.map((c) => c.user_id))];
+    const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", userIds);
+    const profileMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
+
+    const topLevel = comments.map((c) => ({ ...c, profiles: profileMap.get(c.user_id) ?? null })) as CommentWithProfile[];
     for (const c of topLevel) {
       const { count } = await supabase.from("comments").select("id", { count: "exact", head: true }).eq("parent_id", c.id);
       c.reply_count = count ?? 0;
@@ -94,10 +99,14 @@ export default function PostDetailPage() {
       if (!repliesData[commentId]) {
         const { data } = await supabase
           .from("comments")
-          .select("*, profiles!comments_user_id_fkey(username, avatar_url)")
+          .select("*")
           .eq("parent_id", commentId)
           .order("created_at", { ascending: true });
-        setRepliesData((d) => ({ ...d, [commentId]: (data ?? []) as CommentWithProfile[] }));
+        const replies = data ?? [];
+        const userIds = [...new Set(replies.map((r) => r.user_id))];
+        const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", userIds);
+        const profileMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
+        setRepliesData((d) => ({ ...d, [commentId]: replies.map((r) => ({ ...r, profiles: profileMap.get(r.user_id) ?? null })) as CommentWithProfile[] }));
       }
       setExpandedReplies((s) => new Set(s).add(commentId));
     }
