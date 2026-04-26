@@ -138,8 +138,6 @@ npm test
 
 ## Production Deployment
 
-See [DEPLOYMENT-GUIDE.md](./DEPLOYMENT-GUIDE.md) for detailed production deployment instructions.
-
 ### Quick Production Checklist
 
 - [ ] Update `.env` with production values
@@ -344,10 +342,7 @@ This project is licensed under the MIT License.
 
 ## Support
 
-For issues and questions:
-- Check [DEPLOYMENT-GUIDE.md](./DEPLOYMENT-GUIDE.md)
-- Check [PRE-DEPLOYMENT-CHECKLIST.md](./PRE-DEPLOYMENT-CHECKLIST.md)
-- Review [OAUTH-SOCIAL-LOGIN-GUIDE.md](./OAUTH-SOCIAL-LOGIN-GUIDE.md)
+For issues and questions, please refer to the project documentation or create an issue in the repository.
 
 ## Acknowledgments
 
